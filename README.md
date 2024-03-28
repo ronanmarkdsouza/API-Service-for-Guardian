@@ -58,3 +58,29 @@ of the stove requested.
 for the entire fleet.
 
 **Endpoint:** `example.com/:apikey/userstats/`
+
+---
+
+# Building Backend Service Makefile
+
+This Makefile contains targets to build and run the backend service written in Go.
+
+## Build and Run the Service
+
+To run the service, run:
+```bash
+make run
+```
+
+To build the service, run:
+
+```bash
+make build
+```
+
+After the build command is executed the binaries are stored in the bin directory as an executable called app.
+
+To further run the executable, from the root run:
+```bash
+./bin/app.exe
+```
