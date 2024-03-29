@@ -11,6 +11,7 @@ import (
 )
 
 func GetUserByID(c *gin.Context) {
+	var bool_err bool
 	id := c.Param("id")
 
 	db, sshConn, err := db.ConnectToDB(db.DatabaseCreds{
@@ -56,10 +57,18 @@ func GetUserByID(c *gin.Context) {
 		log.Fatal(err)
 	}
 
-	c.JSON(http.StatusOK, usages)
+	if bool_err {
+		c.JSON(http.StatusBadRequest, gin.H{
+			"message": "Account Not Found",
+		})
+	} else {
+		c.JSON(http.StatusOK, usages)
+	}
 }
 
 func GetStatsByID(c *gin.Context) {
+	var bool_err bool
+
 	id := c.Param("id")
 
 	db, sshConn, err := db.ConnectToDB(db.DatabaseCreds{
@@ -90,7 +99,7 @@ func GetStatsByID(c *gin.Context) {
 	for rows.Next() {
 		var stat models.StatsUser
 		if err := rows.Scan(&stat.TotalPowerConsumption, &stat.AvgPowerConsumption); err != nil {
-			log.Fatal(err)
+			bool_err = true
 		}
 		stats = append(stats, stat)
 	}
@@ -98,7 +107,14 @@ func GetStatsByID(c *gin.Context) {
 		log.Fatal(err)
 	}
 
-	c.JSON(http.StatusOK, stats)
+	if bool_err {
+		c.JSON(http.StatusBadRequest, gin.H{
+			"message": "Account Not Found",
+		})
+	} else {
+		c.JSON(http.StatusOK, stats)
+	}
+
 }
 
 func GetStats(c *gin.Context) {
