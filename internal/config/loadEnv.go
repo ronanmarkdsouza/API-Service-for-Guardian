@@ -10,9 +10,11 @@ import (
 var DB_USER, DB_PASS, DB_HOST, DB_NAME, API_PORT, API_KEY string
 
 func LoadEnv() {
-	err := godotenv.Load()
-	if err != nil {
-		log.Fatal("Error loading .env file")
+	if os.Getenv("GO_ENV") != "prod" {
+		err := godotenv.Load()
+		if err != nil {
+			log.Fatal("Error loading .env file")
+		}
 	}
 
 	DB_USER = os.Getenv("DB_USER")
