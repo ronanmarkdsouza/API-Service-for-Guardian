@@ -8,6 +8,8 @@ import (
 	"ronanmarkdsouza/api_service_backend/internal/config"
 	"ronanmarkdsouza/api_service_backend/internal/models"
 
+	_ "github.com/go-sql-driver/mysql"
+
 	"github.com/gin-gonic/gin"
 )
 
