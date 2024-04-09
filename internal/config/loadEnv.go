@@ -12,7 +12,7 @@ var DB_USER, DB_PASS, DB_HOST, DB_NAME, API_PORT, API_KEY string
 
 func LoadEnv() {
 	if os.Getenv("GO_ENV") != "prod" {
-		fmt.Println("running in testing")
+		fmt.Println(os.Getenv("GO_ENV"))
 		err := godotenv.Load()
 		if err != nil {
 			log.Fatal("Error loading .env file")
