@@ -8,6 +8,7 @@ import (
 	"os/signal"
 	"time"
 
+	"ronanmarkdsouza/api_service_backend/internal/config"
 	"ronanmarkdsouza/api_service_backend/internal/controllers"
 	"ronanmarkdsouza/api_service_backend/internal/middleware"
 
@@ -26,7 +27,7 @@ func NewRouter() {
 
 	// Start HTTP server in a separate goroutine
 	srv := &http.Server{
-		Addr:    ":80", // Change port as needed
+		Addr:    ":" + config.API_PORT, // Change port as needed
 		Handler: router,
 	}
 	go func() {
