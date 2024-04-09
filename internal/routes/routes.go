@@ -12,8 +12,6 @@ func NewRouter() {
 	gin.SetMode(gin.ReleaseMode)
 	router := gin.New()
 
-	router.POST("/setapi", controllers.SetAPI)
-
 	router.Use(middleware.AuthenticateMiddleware())
 
 	router.GET("/:apikey/usage/:id", controllers.GetUserByID)

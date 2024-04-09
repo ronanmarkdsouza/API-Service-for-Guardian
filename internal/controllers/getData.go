@@ -1,10 +1,11 @@
 package controllers
 
 import (
+	"database/sql"
+	"fmt"
 	"log"
 	"net/http"
 	"ronanmarkdsouza/api_service_backend/internal/config"
-	"ronanmarkdsouza/api_service_backend/internal/db"
 	"ronanmarkdsouza/api_service_backend/internal/models"
 
 	"github.com/gin-gonic/gin"
@@ -14,20 +15,11 @@ func GetUserByID(c *gin.Context) {
 	var bool_err bool
 	id := c.Param("id")
 
-	db, sshConn, err := db.ConnectToDB(db.DatabaseCreds{
-		SSHHost:    config.SSH_HOST,
-		SSHPort:    config.SSH_PORT,
-		SSHUser:    config.SSH_USER,
-		SSHKeyFile: config.SSH_KEYFILE,
-		DBUser:     config.DB_USER,
-		DBPass:     config.DB_PASS,
-		DBHost:     config.DB_HOST,
-		DBName:     config.DB_NAME,
-	})
+	db, err := sql.Open("mysql", fmt.Sprintf("%s:%s@tcp(%s)/%s", config.DB_USER, config.DB_PASS, config.DB_HOST, config.DB_NAME))
+
 	if err != nil {
 		log.Fatal(err)
 	}
-	defer sshConn.Close()
 	defer db.Close()
 	rows, _ := db.Query(`SELECT 
 							unit_number, 
@@ -71,20 +63,12 @@ func GetStatsByID(c *gin.Context) {
 
 	id := c.Param("id")
 
-	db, sshConn, err := db.ConnectToDB(db.DatabaseCreds{
-		SSHHost:    config.SSH_HOST,
-		SSHPort:    config.SSH_PORT,
-		SSHUser:    config.SSH_USER,
-		SSHKeyFile: config.SSH_KEYFILE,
-		DBUser:     config.DB_USER,
-		DBPass:     config.DB_PASS,
-		DBHost:     config.DB_HOST,
-		DBName:     config.DB_NAME,
-	})
+	db, err := sql.Open("mysql", fmt.Sprintf("%s:%s@tcp(%s)/%s", config.DB_USER, config.DB_PASS, config.DB_HOST, config.DB_NAME))
+
 	if err != nil {
 		log.Fatal(err)
 	}
-	defer sshConn.Close()
+
 	defer db.Close()
 	rows, _ := db.Query(`SELECT 
 							SUM(daily_power_consumption) AS total_power_consumption, 
@@ -119,20 +103,11 @@ func GetStatsByID(c *gin.Context) {
 
 func GetStats(c *gin.Context) {
 
-	db, sshConn, err := db.ConnectToDB(db.DatabaseCreds{
-		SSHHost:    config.SSH_HOST,
-		SSHPort:    config.SSH_PORT,
-		SSHUser:    config.SSH_USER,
-		SSHKeyFile: config.SSH_KEYFILE,
-		DBUser:     config.DB_USER,
-		DBPass:     config.DB_PASS,
-		DBHost:     config.DB_HOST,
-		DBName:     config.DB_NAME,
-	})
+	db, err := sql.Open("mysql", fmt.Sprintf("%s:%s@tcp(%s)/%s", config.DB_USER, config.DB_PASS, config.DB_HOST, config.DB_NAME))
+
 	if err != nil {
 		log.Fatal(err)
 	}
-	defer sshConn.Close()
 	defer db.Close()
 	rows, _ := db.Query(`SELECT 
 							unit_number, 
