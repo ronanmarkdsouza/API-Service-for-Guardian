@@ -24,7 +24,6 @@ func NewRouter() {
 	router.GET("/:apikey/usage/:id", controllers.GetUserByID)
 	router.GET("/:apikey/userstats/:id", controllers.GetStatsByID)
 	router.GET("/:apikey/userstats", controllers.GetStats)
-	router.GET("/:apikey/rawdata", controllers.GetRawData)
 
 	// Start HTTP server in a separate goroutine
 	srv := &http.Server{
