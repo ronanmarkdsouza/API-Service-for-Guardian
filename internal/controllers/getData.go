@@ -43,7 +43,7 @@ func GetUserByID(c *gin.Context) {
 	for rows.Next() {
 		var usage models.Usage
 		if err := rows.Scan(&usage.UnitNumber, &usage.CalendarDate, &usage.LeftCookTime, &usage.RightCookTime, &usage.DailyCookingTime, &usage.DailyPowerConsumption, &usage.StoveOnOffCount, &usage.AvgCookingTimePerUse, &usage.AvgPowerConsumptionPerUse); err != nil {
-			log.Fatal(err)
+			bool_err = true
 		}
 		usages = append(usages, usage)
 	}
