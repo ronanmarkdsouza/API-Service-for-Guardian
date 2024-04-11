@@ -92,7 +92,7 @@ func GetStatsByID(c *gin.Context) {
 		log.Fatal(err)
 	}
 
-	if stats == nil {
+	if len(stats) == 0 {
 		c.JSON(http.StatusBadRequest, gin.H{
 			"message": "Account Not Found",
 		})
