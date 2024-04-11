@@ -61,7 +61,6 @@ func GetUserByID(c *gin.Context) {
 }
 
 func GetStatsByID(c *gin.Context) {
-	var bool_err bool
 
 	id := c.Param("id")
 
@@ -85,7 +84,7 @@ func GetStatsByID(c *gin.Context) {
 	for rows.Next() {
 		var stat models.StatsUser
 		if err := rows.Scan(&stat.TotalPowerConsumption, &stat.AvgPowerConsumption); err != nil {
-			bool_err = true
+			log.Fatal(err)
 		}
 		stats = append(stats, stat)
 	}
@@ -93,7 +92,7 @@ func GetStatsByID(c *gin.Context) {
 		log.Fatal(err)
 	}
 
-	if bool_err {
+	if stats == nil {
 		c.JSON(http.StatusBadRequest, gin.H{
 			"message": "Account Not Found",
 		})
