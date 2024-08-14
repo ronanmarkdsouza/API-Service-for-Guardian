@@ -135,9 +135,58 @@ func GetStats(c *gin.Context) {
 	c.JSON(http.StatusOK, stats)
 }
 
+// func BatchProcessData(c *gin.Context) {
+// 	const batchSize = 1000
+// 	offset := 0
+// 	var bool_err bool
+
+// 	db, err := sql.Open("mysql", fmt.Sprintf("%s:%s@tcp(%s)/%s", config.DB_USER, config.DB_PASS, config.DB_HOST, config.DB_NAME))
+// 	if err != nil {
+// 		log.Fatal(err)
+// 	}
+// 	defer db.Close()
+
+// 	var usages []models.Usage // Adjust the model to match your schema
+
+// 	for {
+// 		rows, err := db.Query(`SELECT
+// 									unit_number AS device_id,
+// 									calendar_date AS date,
+// 									daily_power_consumption AS EG_p_d_y
+// 								FROM
+// 									tbl_daily_compiled_usage_data
+// 								LIMIT ? OFFSET ?`, batchSize, offset)
+
+// 		if err != nil {
+// 			log.Fatal(err)
+// 		}
+
+// 		for rows.Next() {
+// 			var usage models.Usage
+// 			if err := rows.Scan(&usage.UnitNumber, &usage.CalendarDate, &usage.DailyPowerConsumption); err != nil {
+// 				bool_err = true
+// 			}
+// 			usages = append(usages, usage)
+// 		}
+// 		rows.Close()
+
+// 		if len(usages) == 0 {
+// 			break
+// 		}
+
+// 		offset += batchSize
+// 	}
+
+// 	if bool_err {
+// 		c.JSON(http.StatusBadRequest, gin.H{
+// 			"message": "Error occurred during processing",
+// 		})
+// 	} else {
+// 		c.JSON(http.StatusOK, usages)
+// 	}
+// }
+
 func BatchProcessData(c *gin.Context) {
-	const batchSize = 1000
-	offset := 0
 	var bool_err bool
 
 	db, err := sql.Open("mysql", fmt.Sprintf("%s:%s@tcp(%s)/%s", config.DB_USER, config.DB_PASS, config.DB_HOST, config.DB_NAME))
@@ -146,35 +195,31 @@ func BatchProcessData(c *gin.Context) {
 	}
 	defer db.Close()
 
-	var usages []models.Usage // Adjust the model to match your schema
+	// Limit the number of results to 1000 for testing purposes
+	rows, err := db.Query(`SELECT 
+								unit_number AS device_id, 
+								calendar_date AS date, 
+								daily_power_consumption AS EG_p_d_y
+							FROM 
+								tbl_daily_compiled_usage_data 
+							LIMIT 1000`)
+	if err != nil {
+		log.Fatal(err)
+	}
+	defer rows.Close()
 
-	for {
-		rows, err := db.Query(`SELECT 
-									unit_number AS device_id, 
-									calendar_date AS date, 
-									daily_power_consumption AS EG_p_d_y
-								FROM 
-									tbl_daily_compiled_usage_data 
-								LIMIT ? OFFSET ?`, batchSize, offset)
+	var usages []models.Usage
 
-		if err != nil {
-			log.Fatal(err)
+	for rows.Next() {
+		var usage models.Usage
+		if err := rows.Scan(&usage.UnitNumber, &usage.CalendarDate, &usage.DailyPowerConsumption); err != nil {
+			bool_err = true
 		}
+		usages = append(usages, usage)
+	}
 
-		for rows.Next() {
-			var usage models.Usage
-			if err := rows.Scan(&usage.UnitNumber, &usage.CalendarDate, &usage.DailyPowerConsumption); err != nil {
-				bool_err = true
-			}
-			usages = append(usages, usage)
-		}
-		rows.Close()
-
-		if len(usages) == 0 {
-			break
-		}
-
-		offset += batchSize
+	if err := rows.Err(); err != nil {
+		log.Fatal(err)
 	}
 
 	if bool_err {
