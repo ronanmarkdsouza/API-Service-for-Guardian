@@ -22,3 +22,9 @@ type StatsUser struct {
 	TotalPowerConsumption float64 `json:"total_power_consumption"`
 	AvgPowerConsumption   float64 `json:"avg_power_consumption"`
 }
+
+type DeviceUsage struct {
+	DeviceID string  `json:"device_id"`
+	Date     string  `json:"date"`
+	EGPDY    float64 `json:"EG_p_d_y"` // Amount of electricity used by the project device in kWh
+}

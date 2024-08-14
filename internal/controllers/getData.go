@@ -187,15 +187,16 @@ func GetStats(c *gin.Context) {
 // }
 
 func BatchProcessData(c *gin.Context) {
-	var bool_err bool
+	var boolErr bool
 
+	// Connect to the database
 	db, err := sql.Open("mysql", fmt.Sprintf("%s:%s@tcp(%s)/%s", config.DB_USER, config.DB_PASS, config.DB_HOST, config.DB_NAME))
 	if err != nil {
 		log.Fatal(err)
 	}
 	defer db.Close()
 
-	// Limit the number of results to 1000 for testing purposes
+	// Query the database, limiting results to 1000 for testing purposes
 	rows, err := db.Query(`SELECT 
 								unit_number AS device_id, 
 								calendar_date AS date, 
@@ -208,25 +209,28 @@ func BatchProcessData(c *gin.Context) {
 	}
 	defer rows.Close()
 
-	var usages []models.Usage
+	// Store the data in the DeviceUsage struct
+	var deviceUsages []models.DeviceUsage
 
 	for rows.Next() {
-		var usage models.Usage
-		if err := rows.Scan(&usage.UnitNumber, &usage.CalendarDate, &usage.DailyPowerConsumption); err != nil {
-			bool_err = true
+		var usage models.DeviceUsage
+		if err := rows.Scan(&usage.DeviceID, &usage.Date, &usage.EGPDY); err != nil {
+			boolErr = true
 		}
-		usages = append(usages, usage)
+		deviceUsages = append(deviceUsages, usage)
 	}
 
+	// Check for row scan errors
 	if err := rows.Err(); err != nil {
 		log.Fatal(err)
 	}
 
-	if bool_err {
+	// Handle response based on any processing errors
+	if boolErr {
 		c.JSON(http.StatusBadRequest, gin.H{
 			"message": "Error occurred during processing",
 		})
 	} else {
-		c.JSON(http.StatusOK, usages)
+		c.JSON(http.StatusOK, deviceUsages)
 	}
 }
