@@ -196,14 +196,24 @@ func BatchProcessData(c *gin.Context) {
 	}
 	defer db.Close()
 
-	// Query the database, limiting results to 1000 for testing purposes
-	rows, err := db.Query(`SELECT 
-								unit_number AS device_id, 
-								calendar_date AS date, 
-								daily_power_consumption AS EG_p_d_y
-							FROM 
-								tbl_daily_compiled_usage_data 
-							LIMIT 1000`)
+	// Query the database
+	rows, err := db.Query(`
+		SELECT 
+			d.unit_number AS device_id, 
+			d.calendar_date AS date, 
+			d.daily_power_consumption AS EG_p_d_y
+		FROM 
+			tbl_daily_compiled_usage_data d
+		JOIN 
+			tbl_accounts a 
+		ON 
+			d.unit_number = a.account_number
+		WHERE 
+			d.calendar_date > '2023-12-01'
+		AND 
+			a.country = 'Bangladesh'
+		LIMIT 10000`)
+
 	if err != nil {
 		log.Fatal(err)
 	}
