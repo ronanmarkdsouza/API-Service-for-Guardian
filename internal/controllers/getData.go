@@ -211,8 +211,7 @@ func BatchProcessData(c *gin.Context) {
 		WHERE 
 			d.calendar_date > '2023-12-01'
 		AND 
-			a.country = 'Bangladesh'
-		LIMIT 10000`)
+			a.country = 'Bangladesh'`)
 
 	if err != nil {
 		log.Fatal(err)
