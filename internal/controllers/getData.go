@@ -135,57 +135,6 @@ func GetStats(c *gin.Context) {
 	c.JSON(http.StatusOK, stats)
 }
 
-// func BatchProcessData(c *gin.Context) {
-// 	const batchSize = 1000
-// 	offset := 0
-// 	var bool_err bool
-
-// 	db, err := sql.Open("mysql", fmt.Sprintf("%s:%s@tcp(%s)/%s", config.DB_USER, config.DB_PASS, config.DB_HOST, config.DB_NAME))
-// 	if err != nil {
-// 		log.Fatal(err)
-// 	}
-// 	defer db.Close()
-
-// 	var usages []models.Usage // Adjust the model to match your schema
-
-// 	for {
-// 		rows, err := db.Query(`SELECT
-// 									unit_number AS device_id,
-// 									calendar_date AS date,
-// 									daily_power_consumption AS EG_p_d_y
-// 								FROM
-// 									tbl_daily_compiled_usage_data
-// 								LIMIT ? OFFSET ?`, batchSize, offset)
-
-// 		if err != nil {
-// 			log.Fatal(err)
-// 		}
-
-// 		for rows.Next() {
-// 			var usage models.Usage
-// 			if err := rows.Scan(&usage.UnitNumber, &usage.CalendarDate, &usage.DailyPowerConsumption); err != nil {
-// 				bool_err = true
-// 			}
-// 			usages = append(usages, usage)
-// 		}
-// 		rows.Close()
-
-// 		if len(usages) == 0 {
-// 			break
-// 		}
-
-// 		offset += batchSize
-// 	}
-
-// 	if bool_err {
-// 		c.JSON(http.StatusBadRequest, gin.H{
-// 			"message": "Error occurred during processing",
-// 		})
-// 	} else {
-// 		c.JSON(http.StatusOK, usages)
-// 	}
-// }
-
 func BatchProcessData(c *gin.Context) {
 	var boolErr bool
 
@@ -196,7 +145,18 @@ func BatchProcessData(c *gin.Context) {
 	}
 	defer db.Close()
 
-	// Query the database
+	// Get the latest available date first
+	var maxDate string
+	err = db.QueryRow(`
+		SELECT MAX(d.calendar_date) 
+		FROM tbl_daily_compiled_usage_data d
+		JOIN tbl_accounts a 
+		ON d.unit_number = a.account_number`).Scan(&maxDate)
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	// Query the database for data on the latest date
 	rows, err := db.Query(`
 		SELECT 
 			d.unit_number AS device_id, 
@@ -209,9 +169,7 @@ func BatchProcessData(c *gin.Context) {
 		ON 
 			d.unit_number = a.account_number
 		WHERE 
-			d.calendar_date > '2023-12-01'
-		AND 
-			a.country = 'Bangladesh'`)
+			d.calendar_date = ?`, maxDate)
 
 	if err != nil {
 		log.Fatal(err)
