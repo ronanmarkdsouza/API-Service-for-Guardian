@@ -8,9 +8,10 @@ import (
 	"ronanmarkdsouza/api_service_backend/internal/config"
 	"ronanmarkdsouza/api_service_backend/internal/models"
 
-	_ "github.com/go-sql-driver/mysql"
+	"time"
 
 	"github.com/gin-gonic/gin"
+	_ "github.com/go-sql-driver/mysql"
 )
 
 func GetUserByID(c *gin.Context) {
@@ -145,18 +146,10 @@ func BatchProcessData(c *gin.Context) {
 	}
 	defer db.Close()
 
-	// Get the latest available date first
-	var maxDate string
-	err = db.QueryRow(`
-		SELECT MAX(d.calendar_date) 
-		FROM tbl_daily_compiled_usage_data d
-		JOIN tbl_accounts a 
-		ON d.unit_number = a.account_number`).Scan(&maxDate)
-	if err != nil {
-		log.Fatal(err)
-	}
+	// Get today's date in YYYY-MM-DD format
+	today := time.Now().Format("2006-01-02")
 
-	// Query the database for data on the latest date
+	// Query the database for data on today's date
 	rows, err := db.Query(`
 		SELECT 
 			d.unit_number AS device_id, 
@@ -169,7 +162,7 @@ func BatchProcessData(c *gin.Context) {
 		ON 
 			d.unit_number = a.account_number
 		WHERE 
-			d.calendar_date = ?`, maxDate)
+			d.calendar_date = ?`, today)
 
 	if err != nil {
 		log.Fatal(err)
