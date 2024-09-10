@@ -207,6 +207,7 @@ func GetDeviceDataWithVC(c *gin.Context) {
 	defer db.Close()
 
 	// Fetch device data
+	today := time.Now().AddDate(0, 0, -2).Format("2006-01-02")
 	var usage models.DeviceUsage
 	query := `
         SELECT 
@@ -220,9 +221,11 @@ func GetDeviceDataWithVC(c *gin.Context) {
         ON 
             d.unit_number = a.account_number
         WHERE 
-            d.unit_number = ?`
+            d.unit_number = ?
+		AND 
+			d.calendar_date = ?`
 
-	err = db.QueryRow(query, deviceID).Scan(&usage.DeviceID, &usage.Date, &usage.EGPDY)
+	err = db.QueryRow(query, deviceID, today).Scan(&usage.DeviceID, &usage.Date, &usage.EGPDY)
 	if err != nil {
 		c.JSON(http.StatusNotFound, gin.H{"message": "Device not found"})
 		return
