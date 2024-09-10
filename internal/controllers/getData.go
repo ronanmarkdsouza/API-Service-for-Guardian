@@ -147,7 +147,7 @@ func BatchProcessData(c *gin.Context) {
 	defer db.Close()
 
 	// Get today's date in YYYY-MM-DD format
-	today := time.Now().AddDate(0, 0, -1).Format("2006-01-02")
+	today := time.Now().AddDate(0, 0, -2).Format("2006-01-02")
 
 	// Query the database for data on today's date
 	rows, err := db.Query(`
