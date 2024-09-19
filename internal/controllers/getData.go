@@ -1,13 +1,15 @@
 package controllers
 
 import (
+	"crypto/ed25519"
+	"crypto/rand"
 	"database/sql"
+	"encoding/json"
 	"fmt"
 	"log"
 	"net/http"
 	"ronanmarkdsouza/api_service_backend/internal/config"
 	"ronanmarkdsouza/api_service_backend/internal/models"
-
 	"time"
 
 	"github.com/gin-gonic/gin"
@@ -195,6 +197,57 @@ func BatchProcessData(c *gin.Context) {
 	}
 }
 
+// Generate an Ed25519 key pair (public/private keys)
+func GenerateKeyPair() (ed25519.PublicKey, ed25519.PrivateKey, error) {
+	pubKey, privKey, err := ed25519.GenerateKey(rand.Reader)
+	return pubKey, privKey, err
+}
+
+// Sign data using Ed25519 and return the signature
+func SignData(privKey ed25519.PrivateKey, message []byte) []byte {
+	signature := ed25519.Sign(privKey, message)
+	return signature
+}
+
+// Function to generate Verifiable Credential with a signature
+func GenerateVC(usage models.DeviceUsage, privKey ed25519.PrivateKey) (map[string]interface{}, error) {
+	// Create the credential subject
+	credentialSubject := map[string]interface{}{
+		"device_id": usage.DeviceID,
+		"EG_p_d_y":  usage.EGPDY,
+		"date":      usage.Date,
+	}
+
+	// Serialize the credential subject to JSON to be signed
+	credentialSubjectJSON, err := json.Marshal(credentialSubject)
+	if err != nil {
+		return nil, err
+	}
+
+	// Sign the credential subject using the private key
+	signature := SignData(privKey, credentialSubjectJSON)
+
+	// Create the verifiable credential
+	vc := map[string]interface{}{
+		"id":                fmt.Sprintf("urn:uuid:%s-%s", usage.DeviceID, time.Now().Format("2006-01-02T15:04:05Z")),
+		"type":              []string{"VerifiableCredential"},
+		"issuer":            "did:example:issuer",
+		"issuanceDate":      time.Now().Format(time.RFC3339),
+		"@context":          []string{"https://www.w3.org/2018/credentials/v1"},
+		"credentialSubject": credentialSubject,
+		"proof": map[string]interface{}{
+			"type":               "Ed25519Signature2018",
+			"created":            time.Now().Format(time.RFC3339),
+			"verificationMethod": "did:example:issuer#key-1",
+			"proofPurpose":       "assertionMethod",
+			"jws":                fmt.Sprintf("%x", signature), // Convert the signature to a hexadecimal string
+		},
+	}
+
+	return vc, nil
+}
+
+// Function to get device data, generate VC, and sign it
 func GetDeviceDataWithVC(c *gin.Context) {
 	deviceID := c.Param("device_id")
 
@@ -207,7 +260,6 @@ func GetDeviceDataWithVC(c *gin.Context) {
 	defer db.Close()
 
 	// Fetch device data
-	today := time.Now().AddDate(0, 0, -2).Format("2006-01-02")
 	var usage models.DeviceUsage
 	query := `
         SELECT 
@@ -221,41 +273,32 @@ func GetDeviceDataWithVC(c *gin.Context) {
         ON 
             d.unit_number = a.account_number
         WHERE 
-            d.unit_number = ?
-		AND 
-			d.calendar_date = ?`
+            d.unit_number = ?`
 
-	err = db.QueryRow(query, deviceID, today).Scan(&usage.DeviceID, &usage.Date, &usage.EGPDY)
+	err = db.QueryRow(query, deviceID).Scan(&usage.DeviceID, &usage.Date, &usage.EGPDY)
 	if err != nil {
 		c.JSON(http.StatusNotFound, gin.H{"message": "Device not found"})
 		return
 	}
 
-	// Generate VC
-	vc := map[string]interface{}{
-		"id":           fmt.Sprintf("urn:uuid:%s-%s", usage.DeviceID, time.Now().Format("2006-01-02T15:04:05Z")),
-		"type":         []string{"VerifiableCredential"},
-		"issuer":       "did:example:issuer",
-		"issuanceDate": time.Now().Format(time.RFC3339),
-		"@context":     []string{"https://www.w3.org/2018/credentials/v1"},
-		"credentialSubject": map[string]interface{}{
-			"device_id": usage.DeviceID,
-			"EG_p_d_y":  usage.EGPDY,
-			"date":      usage.Date,
-		},
-		"proof": map[string]interface{}{
-			"type":               "Ed25519Signature2018",
-			"created":            time.Now().Format(time.RFC3339),
-			"verificationMethod": "did:example:issuer#key-1",
-			"proofPurpose":       "assertionMethod",
-			"jws":                "unique-signature-here", // Replace with actual signature
-		},
+	// Generate the key pair (in real applications, the private key would be stored securely)
+	pubKey, privKey, err := GenerateKeyPair()
+	if err != nil {
+		log.Fatal("Error generating key pair:", err)
+	}
+
+	// Generate the Verifiable Credential (VC) with the signature
+	vc, err := GenerateVC(usage, privKey)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"message": "VC generation error"})
+		return
 	}
 
 	// Return data with VC attached
 	response := map[string]interface{}{
 		"deviceData":           usage,
 		"verifiableCredential": vc,
+		"publicKey":            fmt.Sprintf("%x", pubKey), // Return the public key as well (optional)
 	}
 
 	c.JSON(http.StatusOK, response)
