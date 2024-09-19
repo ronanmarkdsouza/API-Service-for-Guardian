@@ -12,9 +12,10 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"time"
+
 	"ronanmarkdsouza/api_service_backend/internal/config"
 	"ronanmarkdsouza/api_service_backend/internal/models"
-	"time"
 
 	"github.com/gin-gonic/gin"
 	_ "github.com/go-sql-driver/mysql"
