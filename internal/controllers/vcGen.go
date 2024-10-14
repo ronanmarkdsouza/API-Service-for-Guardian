@@ -19,10 +19,19 @@ import (
 
 	"github.com/gin-gonic/gin"
 	_ "github.com/go-sql-driver/mysql"
+	"github.com/joho/godotenv"
 )
 
 // Directory to store keys for each device
 const keyDir = "./keys"
+
+// Load environment variables
+func loadEnv() {
+	err := godotenv.Load(".env")
+	if err != nil {
+		log.Fatal("Error loading .env file")
+	}
+}
 
 // Generate an Ed25519 key pair (public/private keys)
 func GenerateKeyPair() (ed25519.PublicKey, ed25519.PrivateKey, error) {
@@ -93,8 +102,11 @@ func SignData(privKey ed25519.PrivateKey, message []byte) []byte {
 	return signature
 }
 
-// Generate Verifiable Credential with a signature
+// Generate Verifiable Credential with the new schema and signature
 func GenerateVC(usage models.DeviceUsage, privKey ed25519.PrivateKey) (map[string]interface{}, error) {
+	// Load environment variables
+	loadEnv()
+
 	// Create the credential subject
 	credentialSubject := map[string]interface{}{
 		"device_id": usage.DeviceID,
@@ -111,21 +123,63 @@ func GenerateVC(usage models.DeviceUsage, privKey ed25519.PrivateKey) (map[strin
 	// Sign the credential subject using the private key
 	signature := SignData(privKey, credentialSubjectJSON)
 
-	// Create the verifiable credential
+	// Create the verifiable credential with the new schema
 	vc := map[string]interface{}{
-		"id":                fmt.Sprintf("urn:uuid:%s-%s", usage.DeviceID, time.Now().Format("2006-01-02T15:04:05Z")),
-		"type":              []string{"VerifiableCredential"},
-		"issuer":            "did:example:issuer",
-		"issuanceDate":      time.Now().Format(time.RFC3339),
-		"@context":          []string{"https://www.w3.org/2018/credentials/v1"},
-		"credentialSubject": credentialSubject,
-		"proof": map[string]interface{}{
-			"type":               "Ed25519Signature2018",
-			"created":            time.Now().Format(time.RFC3339),
-			"verificationMethod": "did:example:issuer#key-1",
-			"proofPurpose":       "assertionMethod",
-			"jws":                fmt.Sprintf("%x", signature), // Convert the signature to a hexadecimal string
+		"url":              os.Getenv("VC_URL"),
+		"topic":            os.Getenv("VC_TOPIC"),
+		"hederaAccountId":  os.Getenv("HEDERA_ACCOUNT_ID"),
+		"hederaAccountKey": os.Getenv("HEDERA_ACCOUNT_KEY"),
+		"installer":        os.Getenv("INSTALLER_DID"),
+		"did":              os.Getenv("DEVICE_DID"),
+		"type":             os.Getenv("VC_TYPE"),
+		"schema": map[string]interface{}{
+			"@context": map[string]interface{}{
+				"@version": 1.1,
+				"@vocab":   "https://w3id.org/traceability/#undefinedTerm",
+				"id":       "@id",
+				"type":     "@type",
+				os.Getenv("VC_TYPE"): map[string]interface{}{
+					"@id": fmt.Sprintf("schema:%s#%s", os.Getenv("VC_TYPE"), os.Getenv("VC_TYPE")),
+					"@context": map[string]interface{}{
+						"device_id": map[string]string{"@type": "https://www.schema.org/text"},
+						"policyId":  map[string]string{"@type": "https://www.schema.org/text"},
+						"ref":       map[string]string{"@type": "https://www.schema.org/text"},
+						"date":      map[string]string{"@type": "https://www.schema.org/text"},
+						"eg_p_d_y":  map[string]string{"@type": "https://www.schema.org/text"},
+					},
+				},
+			},
 		},
+		"context": map[string]interface{}{
+			"type":     os.Getenv("VC_TYPE"),
+			"@context": []string{fmt.Sprintf("schema:%s", os.Getenv("VC_TYPE"))},
+		},
+		"didDocument": map[string]interface{}{
+			"id":       os.Getenv("DEVICE_DID"),
+			"@context": "https://www.w3.org/ns/did/v1",
+			"verificationMethod": []map[string]interface{}{
+				{
+					"id":               fmt.Sprintf("%s#did-root-key", os.Getenv("DEVICE_DID")),
+					"type":             "Ed25519VerificationKey2018",
+					"controller":       os.Getenv("DEVICE_DID"),
+					"publicKeyBase58":  os.Getenv("DEVICE_PUBLIC_KEY"),
+					"privateKeyBase58": os.Getenv("DEVICE_PRIVATE_KEY"),
+				},
+				{
+					"id":               fmt.Sprintf("%s#did-root-key-bbs", os.Getenv("DEVICE_DID")),
+					"type":             "Bls12381G2Key2020",
+					"controller":       os.Getenv("DEVICE_DID"),
+					"publicKeyBase58":  os.Getenv("BBS_PUBLIC_KEY"),
+					"privateKeyBase58": os.Getenv("BBS_PRIVATE_KEY"),
+				},
+			},
+			"authentication":  []string{fmt.Sprintf("%s#did-root-key", os.Getenv("DEVICE_DID"))},
+			"assertionMethod": []string{"#did-root-key", "#did-root-key-bbs"},
+		},
+		"policyId":  os.Getenv("POLICY_ID"),
+		"policyTag": fmt.Sprintf("Tag_%d", time.Now().UnixNano()/1e6),
+		"ref":       os.Getenv("REF"),
+		"signature": hex.EncodeToString(signature), // Include the signature in the VC
 	}
 
 	return vc, nil
@@ -181,19 +235,13 @@ func GetDeviceDataWithVC(c *gin.Context) {
 		}
 	}
 
-	// Generate the Verifiable Credential (VC) with the signature
+	// Generate the Verifiable Credential (VC) and sign it
 	vc, err := GenerateVC(usage, privKey)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"message": "VC generation error"})
+		c.JSON(http.StatusInternalServerError, gin.H{"message": "Error generating VC"})
 		return
 	}
 
-	// Return data with VC attached
-	response := map[string]interface{}{
-		"deviceData":           usage,
-		"verifiableCredential": vc,
-		"publicKey":            fmt.Sprintf("%x", pubKey), // Return the public key as well (optional)
-	}
-
-	c.JSON(http.StatusOK, response)
+	// Return the VC as JSON
+	c.JSON(http.StatusOK, gin.H{"verifiable_credential": vc})
 }
