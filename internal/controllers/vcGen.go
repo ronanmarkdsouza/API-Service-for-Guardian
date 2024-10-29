@@ -71,8 +71,6 @@ func GetDeviceDataWithVC(c *gin.Context) {
 		return
 	}
 
-	dateParsed, _ := time.Parse(time.RFC3339, usage.Date)
-
 	// Return the data and VC
 	response := map[string]interface{}{
 		"topic":           "0.0.4921903",
@@ -91,7 +89,7 @@ func GetDeviceDataWithVC(c *gin.Context) {
 				"device_id": usage.DeviceID,
 				"policyId":  "66f80eb5f9354670c79dfe42",
 				"ref":       "did:hedera:testnet:3ytzZFqHBK7pe4wvVmAAY6ea3MMtFZ7KM3ESdYDNSVqe_0.0.1727755931401",
-				"date":      dateParsed.Format(time.RFC3339), // Use the parsed date
+				"date":      usage.Date, // Use the parsed date
 				"eg_p_d_y":  usage.EGPDY,
 			},
 			"signature": vc["proof"].(map[string]interface{})["jws"],
