@@ -64,18 +64,38 @@ func GetDeviceDataWithVC(c *gin.Context) {
 
 	client.SetOperator(operatorAccountID, operatorPrivateKey)
 
-	// Generate the Verifiable Credential (VC) as per the specified schema
+	// Generate the Verifiable Credential (VC) according to the specified schema
 	vc, err := GenerateVCWithHedera(usage, operatorPrivateKey)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"message": "VC generation error"})
 		return
 	}
 
+	dateParsed, _ := time.Parse(time.RFC3339, usage.Date)
+
 	// Return the data and VC
 	response := map[string]interface{}{
-		"deviceData":           usage,
-		"verifiableCredential": vc,
-		"publicKey":            operatorPrivateKey.PublicKey().String(), // Hedera public key
+		"topic":           "0.0.4921903",
+		"hederaAccountId": operatorAccountID.String(),
+		"installer":       "did:hedera:testnet:72x3xNHsHCB5Jh3EuWoGXWmdcEhkCk96dfDbKwfWQ8Kf_0.0.4913133",
+		"did":             "did:hedera:testnet:3ytzZFqHBK7pe4wvVmAAY6ea3MMtFZ7KM3ESdYDNSVqe_0.0.1727755931401",
+		"type":            "778171bf-f13a-441d-827a-dd262e555e87",
+		"schema":          getSchema(),
+		"context":         getContext(),
+		"didDocument":     getDidDocument(),
+		"policyId":        "66f80eb5f9354670c79dfe42",
+		"policyTag":       "Tag_1727532626422",
+		"ref":             "did:hedera:testnet:3ytzZFqHBK7pe4wvVmAAY6ea3MMtFZ7KM3ESdYDNSVqe_0.0.1727755931401",
+		"signedData": map[string]interface{}{
+			"data": map[string]interface{}{
+				"device_id": usage.DeviceID,
+				"policyId":  "66f80eb5f9354670c79dfe42",
+				"ref":       "did:hedera:testnet:3ytzZFqHBK7pe4wvVmAAY6ea3MMtFZ7KM3ESdYDNSVqe_0.0.1727755931401",
+				"date":      dateParsed.Format(time.RFC3339), // Use the parsed date
+				"eg_p_d_y":  usage.EGPDY,
+			},
+			"signature": vc["proof"].(map[string]interface{})["jws"],
+		},
 	}
 
 	c.JSON(http.StatusOK, response)
@@ -119,4 +139,47 @@ func GenerateVCWithHedera(usage models.DeviceUsage, privateKey hedera.PrivateKey
 	}
 
 	return vc, nil
+}
+
+func getSchema() map[string]interface{} {
+	return map[string]interface{}{
+		"@context": map[string]interface{}{
+			"@version": 1.1,
+			"@vocab":   "https://w3id.org/traceability/#undefinedTerm",
+			"id":       "@id",
+			"type":     "@type",
+			"778171bf-f13a-441d-827a-dd262e555e87": map[string]interface{}{
+				"@id": "schema:778171bf-f13a-441d-827a-dd262e555e87#778171bf-f13a-441d-827a-dd262e555e87",
+				"@context": map[string]interface{}{
+					"device_id": map[string]interface{}{"@type": "https://www.schema.org/text"},
+					"policyId":  map[string]interface{}{"@type": "https://www.schema.org/text"},
+					"ref":       map[string]interface{}{"@type": "https://www.schema.org/text"},
+					"date":      map[string]interface{}{"@type": "https://www.schema.org/text"},
+					"eg_p_d_y":  map[string]interface{}{"@type": "https://www.schema.org/text"},
+				},
+			},
+		},
+	}
+}
+
+func getContext() map[string]interface{} {
+	return map[string]interface{}{
+		"type":     "778171bf-f13a-441d-827a-dd262e555e87",
+		"@context": []string{"schema:778171bf-f13a-441d-827a-dd262e555e87"},
+	}
+}
+
+func getDidDocument() map[string]interface{} {
+	return map[string]interface{}{
+		"id":       "did:hedera:testnet:3ytzZFqHBK7pe4wvVmAAY6ea3MMtFZ7KM3ESdYDNSVqe_0.0.1727755931401",
+		"@context": "https://www.w3.org/ns/did/v1",
+		"verificationMethod": []map[string]interface{}{
+			{
+				"id":                 "did:hedera:testnet:3ytzZFqHBK7pe4wvVmAAY6ea3MMtFZ7KM3ESdYDNSVqe_0.0.1727755931401#did-root-key",
+				"type":               "Ed25519VerificationKey2018",
+				"controller":         "did:hedera:testnet:3ytzZFqHBK7pe4wvVmAAY6ea3MMtFZ7KM3ESdYDNSVqe_0.0.1727755931401",
+				"publicKeyMultibase": "z6Mkf5aaT1vRE5bwZH4cABxrGn3M2XZ78m7YbJ4BoXSMyGvz",
+			},
+		},
+	}
 }
