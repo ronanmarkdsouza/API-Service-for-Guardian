@@ -50,22 +50,29 @@ func GetDeviceDataWithVC(c *gin.Context) {
 
 	// Initialize Hedera Client
 	client := hedera.ClientForTestnet() // Switch to ClientForMainnet() for production
+
+	// Generate a new key pair for signing
+	operatorPrivateKey, err := hedera.GeneratePrivateKey()
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"message": "Failed to generate private key"})
+		return
+	}
+	operatorPublicKey := operatorPrivateKey.PublicKey()
+
+	// Create a new DID based on the public key
+	did := fmt.Sprintf("did:hedera:testnet:%s", operatorPublicKey.String())
+
+	// Set the operator account ID from environment variable (if necessary)
 	operatorAccountID, err := hedera.AccountIDFromString(os.Getenv("HEDERA_OPERATOR_ID"))
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"message": "Invalid Hedera operator ID"})
 		return
 	}
 
-	operatorPrivateKey, err := hedera.PrivateKeyFromString(os.Getenv("HEDERA_OPERATOR_KEY"))
-	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"message": "Invalid Hedera operator private key"})
-		return
-	}
-
 	client.SetOperator(operatorAccountID, operatorPrivateKey)
 
 	// Generate the Verifiable Credential (VC) according to the specified schema
-	vc, err := GenerateVCWithHedera(usage, operatorPrivateKey)
+	vc, err := GenerateVCWithHedera(usage, operatorPrivateKey, did)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"message": "VC generation error"})
 		return
@@ -76,11 +83,11 @@ func GetDeviceDataWithVC(c *gin.Context) {
 		"topic":           "0.0.4921903",
 		"hederaAccountId": operatorAccountID.String(),
 		"installer":       "did:hedera:testnet:72x3xNHsHCB5Jh3EuWoGXWmdcEhkCk96dfDbKwfWQ8Kf_0.0.4913133",
-		"did":             "did:hedera:testnet:3ytzZFqHBK7pe4wvVmAAY6ea3MMtFZ7KM3ESdYDNSVqe_0.0.1727755931401",
+		"did":             did, // Use the generated DID
 		"type":            "778171bf-f13a-441d-827a-dd262e555e87",
 		"schema":          getSchema(),
 		"context":         getContext(),
-		"didDocument":     getDidDocument(),
+		"didDocument":     getDidDocument(did, operatorPublicKey),
 		"policyId":        "66f80eb5f9354670c79dfe42",
 		"policyTag":       "Tag_1727532626422",
 		"ref":             "did:hedera:testnet:3ytzZFqHBK7pe4wvVmAAY6ea3MMtFZ7KM3ESdYDNSVqe_0.0.1727755931401",
@@ -89,7 +96,7 @@ func GetDeviceDataWithVC(c *gin.Context) {
 				"device_id": usage.DeviceID,
 				"policyId":  "66f80eb5f9354670c79dfe42",
 				"ref":       "did:hedera:testnet:3ytzZFqHBK7pe4wvVmAAY6ea3MMtFZ7KM3ESdYDNSVqe_0.0.1727755931401",
-				"date":      usage.Date, // Use the parsed date
+				"date":      usage.Date,
 				"eg_p_d_y":  usage.EGPDY,
 			},
 			"signature": vc["proof"].(map[string]interface{})["jws"],
@@ -100,7 +107,7 @@ func GetDeviceDataWithVC(c *gin.Context) {
 }
 
 // GenerateVCWithHedera creates a Verifiable Credential and signs it with Hedera
-func GenerateVCWithHedera(usage models.DeviceUsage, privateKey hedera.PrivateKey) (map[string]interface{}, error) {
+func GenerateVCWithHedera(usage models.DeviceUsage, privateKey hedera.PrivateKey, did string) (map[string]interface{}, error) {
 	// Prepare credential subject schema
 	credentialSubject := map[string]interface{}{
 		"device_id": usage.DeviceID,
@@ -112,7 +119,7 @@ func GenerateVCWithHedera(usage models.DeviceUsage, privateKey hedera.PrivateKey
 	vc := map[string]interface{}{
 		"id":                fmt.Sprintf("urn:uuid:%s-%s", usage.DeviceID, time.Now().Format("2006-01-02T15:04:05Z")),
 		"type":              []string{"VerifiableCredential"},
-		"issuer":            "did:hedera:" + privateKey.PublicKey().String(),
+		"issuer":            did, // Use the generated DID
 		"issuanceDate":      time.Now().Format(time.RFC3339),
 		"@context":          []string{"https://www.w3.org/2018/credentials/v1"},
 		"credentialSubject": credentialSubject,
@@ -131,7 +138,7 @@ func GenerateVCWithHedera(usage models.DeviceUsage, privateKey hedera.PrivateKey
 	vc["proof"] = map[string]interface{}{
 		"type":               "Ed25519Signature2018",
 		"created":            time.Now().Format(time.RFC3339),
-		"verificationMethod": "did:hedera:" + privateKey.PublicKey().String(),
+		"verificationMethod": did, // Use the generated DID for verification
 		"proofPurpose":       "assertionMethod",
 		"jws":                fmt.Sprintf("%x", signature), // Hex-encoded signature
 	}
@@ -167,16 +174,16 @@ func getContext() map[string]interface{} {
 	}
 }
 
-func getDidDocument() map[string]interface{} {
+func getDidDocument(did string, publicKey hedera.PublicKey) map[string]interface{} {
 	return map[string]interface{}{
-		"id":       "did:hedera:testnet:3ytzZFqHBK7pe4wvVmAAY6ea3MMtFZ7KM3ESdYDNSVqe_0.0.1727755931401",
+		"id":       did, // Use the generated DID
 		"@context": "https://www.w3.org/ns/did/v1",
 		"verificationMethod": []map[string]interface{}{
 			{
-				"id":                 "did:hedera:testnet:3ytzZFqHBK7pe4wvVmAAY6ea3MMtFZ7KM3ESdYDNSVqe_0.0.1727755931401#did-root-key",
+				"id":                 fmt.Sprintf("%s#did-root-key", did),
 				"type":               "Ed25519VerificationKey2018",
-				"controller":         "did:hedera:testnet:3ytzZFqHBK7pe4wvVmAAY6ea3MMtFZ7KM3ESdYDNSVqe_0.0.1727755931401",
-				"publicKeyMultibase": "z6Mkf5aaT1vRE5bwZH4cABxrGn3M2XZ78m7YbJ4BoXSMyGvz",
+				"controller":         did,
+				"publicKeyMultibase": publicKey.String(),
 			},
 		},
 	}
